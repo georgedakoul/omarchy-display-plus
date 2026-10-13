@@ -17,7 +17,14 @@ m3 = ("wfd_video_formats: 00 00 02 10 0001FFFF 3FFFFFFF 00000FFF 00 0000 0000 11
       "wfd_client_rtp_ports: RTP/AVP/UDP;unicast 1028 0 mode=play\r\n")
 f = cast.choose_format(cast.parse_params(m3))
 assert f["video"].startswith("00 00 01 10 00000100 "), f  # constrained baseline, 1080p60
+assert f["level"] == 42, f
 assert (f["width"], f["height"], f["fps"], f["port"], f["aac"]) == (1920, 1080, 60, 1028, True), f
+
+# A TV that decodes only up to level 4 gets 1080p30, never a 1080p60 stream it cannot play.
+f = cast.choose_format(cast.parse_params(
+    "wfd_video_formats: 00 00 01 04 00000180 00000000 00000000 00 0000 0000 00 none none\n"
+    "wfd_client_rtp_ports: RTP/AVP/UDP;unicast 1028 0 mode=play\n"))
+assert (f["width"], f["fps"], f["level"]) == (1920, 30, 40) and f["video"].startswith("00 00 01 04 00000080 "), f
 
 # A basic 720p30 sink with LPCM only.
 f = cast.choose_format(cast.parse_params(

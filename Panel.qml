@@ -1115,18 +1115,22 @@ Panel {
             Item {
               width: parent.width
               visible: !!root.cast
-              implicitHeight: stopCast.implicitHeight
+              implicitHeight: Math.max(stopCast.implicitHeight, castState.implicitHeight)
 
               Text {
+                id: castState
                 anchors.left: parent.left
                 anchors.right: stopCast.left
                 anchors.verticalCenter: parent.verticalCenter
                 leftPadding: Style.space(6)
                 textFormat: Text.PlainText
-                text: !root.cast ? "" : root.cast.state === "casting"
+                text: !root.cast ? "" : root.cast.state === "failed"
+                  ? "Cast failed: " + root.cast.error
+                  : root.cast.state === "casting"
                   ? (root.cast.mode === "extend" ? "Extending to " : "Mirroring to ") + root.cast.name
                   : "Connecting" + (root.cast.name ? " to " + root.cast.name : "") + " · accept on the TV"
-                color: Style.selectedStateColor(root.bar.foreground, Color.accent)
+                wrapMode: root.cast && root.cast.state === "failed" ? Text.WordWrap : Text.NoWrap
+                color: root.cast && root.cast.state === "failed" ? Color.urgent : Style.selectedStateColor(root.bar.foreground, Color.accent)
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.body
                 elide: Text.ElideRight
@@ -1135,7 +1139,7 @@ Panel {
               Button {
                 id: stopCast
                 anchors.right: parent.right
-                text: "Stop"
+                text: root.cast && root.cast.state === "failed" ? "Dismiss" : "Stop"
                 iconText: "󰓛"
                 bordered: true
                 foreground: root.bar.foreground

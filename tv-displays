@@ -143,7 +143,9 @@ state)
     --slurpfile s "$STATE" --argjson tvs "$tvs" \
     --arg ip "$(tailscale ip -4 2>/dev/null | head -1 || true)" \
     --argjson sunshine "$(has_sunshine && echo true || echo false)" \
-    --argjson cast "$(cat "${XDG_RUNTIME_DIR:-/run/user/$UID}/omarchy-cast.json" 2>/dev/null || echo null)" '
+    --argjson cast "$(cat "${XDG_RUNTIME_DIR:-/run/user/$UID}/omarchy-cast.json" 2>/dev/null || echo null)" \
+    --arg castActive "$(systemctl --user is-active omarchy-cast 2>/dev/null || true)" '
+    ($cast | if . == null or .state == "failed" or $castActive == "active" then . else null end) as $cast |
     { sunshine: $sunshine, ip: $ip, tvs: $tvs, cast: $cast,
       displays: map({ name, description, width, height, transform, focused, x, y, scale,
         physicalWidth, physicalHeight, inches: ($s[0].outputs[.name].inches // (if .name == "CAST-1" then $cast.inches // 0 else 0 end)),

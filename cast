@@ -7,7 +7,7 @@
 
 start runs as the transient user unit omarchy-cast, so the panel and stop can find it.
 """
-import json, os, re, secrets, signal, socket, subprocess, sys, time
+import json, os, re, secrets, shutil, signal, socket, subprocess, sys
 
 NM = "org.freedesktop.NetworkManager"
 CON = "omarchy-cast"
@@ -17,8 +17,10 @@ STATUS = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "omarchy-cast.j
 # WFD device info: source, available for a session, RTSP on 7236, 200 Mbps.
 WFD_IES = "00:00:06:00:90:1c:44:00:c8"
 RTSP_PORT = 7236
-# CEA bit -> (width, height, fps), best first.
-CEA = [(8, 1920, 1080, 60), (7, 1920, 1080, 30), (6, 1280, 720, 60), (5, 1280, 720, 30), (0, 640, 480, 60)]
+# CEA bit -> (width, height, fps, H.264 level it needs as a WFD level bit), best first.
+CEA = [(8, 1920, 1080, 60, 0x10), (7, 1920, 1080, 30, 0x04), (6, 1280, 720, 60, 0x02), (5, 1280, 720, 30, 0x01),
+       (0, 640, 480, 60, 0x01)]
+LEVEL_IDC = {0x01: 31, 0x02: 32, 0x04: 40, 0x08: 41, 0x10: 42}
 
 
 def busctl(*args):
@@ -77,14 +79,15 @@ def choose_format(params):
     codecs = [c for c in codecs if len(c) >= 3]
     if not codecs:
         raise RuntimeError("TV sent no video formats")
-    codec = max(codecs, key=lambda c: (int(c[0], 16) == 1, int(c[1], 16)))  # constrained baseline, highest level
-    cea = int(codec[2], 16)
-    bit, w, h, fps = next(r for r in CEA if cea >> r[0] & 1 or r[0] == 0)
-    video = f"00 00 01 {codec[1]} {1 << bit:08X} 00000000 00000000 00 0000 0000 00 none none"
+    codec = max(codecs, key=lambda c: (int(c[0], 16) & 1, int(c[1], 16)))  # constrained baseline, highest level
+    cea, max_level = int(codec[2], 16), int(codec[1], 16)
+    # A stream above the level the TV decodes plays as a black screen.
+    bit, w, h, fps, level = next(r for r in CEA if (cea >> r[0] & 1 and r[4] <= max_level) or r[0] == 0)
+    video = f"00 00 01 {level:02X} {1 << bit:08X} 00000000 00000000 00 0000 0000 00 none none"
     aac = "AAC" in params.get("wfd_audio_codecs", "")
     port = int(params.get("wfd_client_rtp_ports", "").split()[1])
     return {"video": video, "audio": "AAC 00000001 00" if aac else "none", "aac": aac, "port": port,
-            "width": w, "height": h, "fps": fps}
+            "width": w, "height": h, "fps": fps, "level": LEVEL_IDC[level]}
 
 
 class Rtsp:
@@ -144,38 +147,60 @@ def run(*cmd):
 
 
 def recorder(output, sink_ip, fmt):
-    cmd = ["wf-recorder", "-o", output, "-c", "h264_vaapi", "-d", "/dev/dri/renderD128", "-r", str(fmt["fps"]),
+    """Capture with wf-recorder, then remux with ffmpeg: only its muxer can set the PIDs Miracast requires."""
+    # -D sends frames even when the screen is still, so the TV never sees the stream stall.
+    cmd = ["wf-recorder", "-D", "-o", output, "-c", "h264_vaapi", "-d", "/dev/dri/renderD128", "-r", str(fmt["fps"]),
            "-F", f"scale_vaapi=w={fmt['width']}:h={fmt['height']}:format=nv12",
-           "-p", "profile=constrained_baseline", "-p", f"g={fmt['fps']}", "-p", "bf=0", "-p", "b=8M",
-           "-m", "rtp_mpegts", "-f", f"rtp://{sink_ip}:{fmt['port']}?pkt_size=1328", "-y"]
+           "-p", "profile=constrained_baseline", "-p", f"level={fmt['level']}", "-p", "aud=1",
+           "-p", f"g={fmt['fps']}", "-p", "bf=0", "-p", "b=8M", "-m", "mpegts", "-f", "pipe:1", "-y"]
     if fmt["aac"]:
         sink = run("pactl", "get-default-sink").stdout.strip()
-        cmd += ["-a", sink + ".monitor", "-C", "aac", "-R", "48000"]
-    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        cmd += ["--audio=" + sink + ".monitor", "-C", "aac", "-R", "48000"]
+    # WFD fixes the transport stream layout: PMT on PID 0x100, video on 0x1011, audio on 0x1100.
+    mux = ["ffmpeg", "-v", "error", "-fflags", "nobuffer", "-probesize", "32768", "-analyzeduration", "0",
+           "-f", "mpegts", "-i", "pipe:0", "-map", "0", "-c", "copy", "-streamid", "0:0x1011",
+           *(["-streamid", "1:0x1100"] if fmt["aac"] else []), "-mpegts_muxer_options", "mpegts_pmt_start_pid=0x100",
+           "-f", "rtp_mpegts", f"rtp://{sink_ip}:{fmt['port']}?pkt_size=1328&localrtpport=5004"]
+    cap = subprocess.Popen(cmd, stdout=subprocess.PIPE)  # stderr goes to the unit's journal
+    return [cap, subprocess.Popen(mux, stdin=cap.stdout, stdout=subprocess.DEVNULL)]
+
+
+def teardown():
+    run("nmcli", "connection", "delete", CON)
+    if any(m["name"] == OUTPUT for m in json.loads(run("hyprctl", "monitors", "all", "-j").stdout or "[]")):
+        run("hyprctl", "output", "remove", OUTPUT)
 
 
 def start(mac, mode):
     tv = next((t for t in tvs() if t["mac"].lower() == mac.lower()), None)
-    if not tv:
-        sys.exit(f"no Miracast TV {mac} nearby")
     output = OUTPUT if mode == "extend" else next(m["name"] for m in json.loads(run("hyprctl", "monitors", "-j").stdout) if m["focused"])
-    info = {"name": tv["name"], "mac": mac, "mode": mode, "output": output, "inches": tv["inches"]}
+    info = {"name": tv["name"] if tv else mac, "mac": mac, "mode": mode, "output": output, "inches": tv["inches"] if tv else 0}
     status(**info, state="connecting")
     rec = None
+    stream = {}
 
-    def cleanup(*_, code=0):
-        if rec:
-            rec.terminate()
-        run("nmcli", "connection", "delete", CON)
-        if mode == "extend":
-            run("hyprctl", "output", "remove", OUTPUT)
-        if os.path.exists(STATUS):
+    def cleanup(*_, error=None):
+        for p in rec or []:
+            p.terminate()
+            try:
+                p.wait(5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+        teardown()
+        if error:  # stays in the panel until dismissed with `cast stop`
+            print(f"cast: {error}", file=sys.stderr)
+            status(**info, state="failed", error=str(error))
+        elif os.path.exists(STATUS):
             os.remove(STATUS)
-        sys.exit(code)
+        sys.exit(1 if error else 0)
 
     signal.signal(signal.SIGTERM, cleanup)
     signal.signal(signal.SIGINT, cleanup)
     try:
+        if not tv:
+            raise RuntimeError("the TV is no longer nearby, turn it on and open Screen Mirroring")
+        if not shutil.which("wf-recorder"):
+            raise RuntimeError("wf-recorder is not installed")
         if mode == "extend":
             run("hyprctl", "output", "create", "headless", OUTPUT)
         server = socket.create_server(("0.0.0.0", RTSP_PORT), reuse_port=True)
@@ -190,10 +215,13 @@ def start(mac, mode):
         up = run("nmcli", "--wait", "120", "connection", "up", CON)
         if up.returncode:
             raise RuntimeError("TV did not accept: " + up.stderr.strip())
-        conn, (sink_ip, _) = server.accept()
+        try:
+            conn, (sink_ip, _) = server.accept()
+        except socket.timeout:
+            raise RuntimeError("the TV connected but never started the session")
+        conn.settimeout(30)
         rtsp = Rtsp(conn)
         session = secrets.token_hex(8)
-        stream = {}
 
         def handle(start_line, headers, body):
             method = start_line.split()[0]
@@ -206,13 +234,15 @@ def start(mac, mode):
                 stream["play"] = True
             elif method == "TEARDOWN":
                 rtsp.reply(headers)
-                raise ConnectionError("TV ended the cast")
+                cleanup()
             else:  # GET_PARAMETER keep-alive, SET_PARAMETER wfd_idr_request: key frames come every second anyway
                 rtsp.reply(headers)
 
         rtsp.request("OPTIONS", url="*", extra={"Require": "org.wfa.wfd1.0"}, wait=handle)  # M1, answers M2 meanwhile
-        fmt = choose_format(parse_params(rtsp.request(
-            "GET_PARAMETER", "wfd_video_formats\r\nwfd_audio_codecs\r\nwfd_client_rtp_ports\r\n", wait=handle)))  # M3
+        caps = parse_params(rtsp.request(
+            "GET_PARAMETER", "wfd_video_formats\r\nwfd_audio_codecs\r\nwfd_client_rtp_ports\r\n", wait=handle))  # M3
+        print(f"cast: TV offers {caps}", file=sys.stderr)  # the first thing to read when a new TV misbehaves
+        fmt = choose_format(caps)
         local_ip = conn.getsockname()[0]
         rtsp.request("SET_PARAMETER", wait=handle, body=(  # M4
             f"wfd_video_formats: {fmt['video']}\r\nwfd_audio_codecs: {fmt['audio']}\r\n"
@@ -230,11 +260,13 @@ def start(mac, mode):
                     handle(*msg)
             except socket.timeout:
                 rtsp.request("GET_PARAMETER", extra={"Session": session})  # keep-alive, answered in the loop
-            if rec and rec.poll() is not None:
-                raise RuntimeError("screen capture stopped")
+            if rec and any(p.poll() is not None for p in rec):
+                raise RuntimeError("screen capture stopped, see journalctl --user -u omarchy-cast")
+    except ConnectionError as e:
+        # Once playing, the TV hanging up (turned off, input changed) is a normal end.
+        cleanup(error=None if stream.get("play") else e)
     except Exception as e:
-        print(f"cast: {e}", file=sys.stderr)
-        cleanup(code=1)
+        cleanup(error=str(e) or type(e).__name__)
 
 
 def main():
@@ -242,13 +274,17 @@ def main():
     if cmd[0] == "scan":
         scan()
     elif cmd[0] == "start" and len(cmd) == 3 and re.fullmatch(r"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", cmd[1]) and cmd[2] in ("mirror", "extend"):
-        if os.environ.get("INVOCATION_ID"):
+        # INVOCATION_ID is no test: the whole Hyprland session inherits it from its own unit.
+        if f"/{UNIT}.service" in open("/proc/self/cgroup").read():
             start(cmd[1], cmd[2])
         else:  # run under systemd so it outlives the panel and `cast stop` can end it
             run("systemctl", "--user", "stop", UNIT)
             sys.exit(run("systemd-run", "--user", "--collect", f"--unit={UNIT}", os.path.realpath(__file__), *cmd).returncode)
     elif cmd[0] == "stop":
         run("systemctl", "--user", "stop", UNIT)
+        teardown()  # leftovers of a cast that was killed or crashed
+        if os.path.exists(STATUS):
+            os.remove(STATUS)
     else:
         sys.exit(__doc__)
 
