@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "ghostl9.monitor",
+  "name": "Display",
+  "version": "1.0.0",
+  "author": "George Damian Koulouris",
+  "description": "Screen map with drag-to-arrange, rotation, TV screens over Tailscale and Miracast casting",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Display",
+    "description": "Screen map with drag-to-arrange, rotation, TV screens over Tailscale and Miracast casting",
+    "category": "System",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.monitor"
+  }
+}
