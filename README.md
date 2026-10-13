@@ -2,6 +2,8 @@
 
 A drop-in replacement for Omarchy's Display panel that adds a Windows-style screen map, TV screens over the internet, and Miracast casting.
 
+Windows has had Win+K since 2013: pick a TV, and your screen is on it. Linux never got the same, because the pieces belong to different projects (the Wi-Fi driver, NetworkManager, the compositor, the encoder) and nobody joined them up for Hyprland. This plugin does, inside Omarchy's bar. Click the Display icon, pick your TV, press Mirror or Extend.
+
 - **Screen map.** Every screen is drawn at its real size in inches. Drag one to move it, and it snaps to the edges of the others. Click a screen to select it, then rotate it from the buttons under the map.
 - **TV screens over the internet.** Add a TV screen and pair Moonlight on the TV with the address shown. The TV gets its own Sunshine stream over Tailscale. It appears on the map only once a device has paired.
 - **Cast to TV.** Lists Miracast TVs nearby. Pick Mirror to show the screen you are on, or Extend to get a new screen on the map at the TV's size.
@@ -28,14 +30,26 @@ git clone https://github.com/georgedakoul/omarchy-display-plus ~/.config/omarchy
 
 - Omarchy with Hyprland's Lua config.
 - TV screens: Sunshine (the panel's Install streaming button runs `omarchy-install-service-sunshine`), Tailscale, and Moonlight on the TV. Ports are opened on `tailscale0` only.
-- Casting: NetworkManager with a Wi-Fi card that supports Wi-Fi Direct, `dnsmasq`, and `wf-recorder`.
+- Casting: NetworkManager with a Wi-Fi card that supports Wi-Fi Direct (`iw list` shows `P2P-GO`), a GPU with VA-API H.264 encoding, `dnsmasq`, `ffmpeg` and `wf-recorder` (`sudo pacman -S wf-recorder`).
 
 ## How it works
 
 - `tv-displays` keeps positions, rotation and TV screens in `~/.config/omarchy/tv-displays.json` and writes them to `~/.config/hypr/displays.lua`.
-- `cast` finds TVs through NetworkManager, connects over Wi-Fi Direct, runs the Miracast session itself and streams with `wf-recorder`.
+- `cast` finds TVs through NetworkManager, connects over Wi-Fi Direct, runs the Miracast session itself and streams with `wf-recorder`, hardware-encoded through VA-API. It sends the stream exactly as the Wi-Fi Display spec asks (the H.264 level the TV can decode, the fixed MPEG-TS PIDs), because TVs tested only against Windows show a black screen for anything else.
 
-Casting is new. Finding TVs works, but it has not yet been tried on many TV brands.
+## Tested on
+
+| TV | Mirror | Extend |
+|---|---|---|
+| Samsung UE50TU7172 (2020, Tizen) | 1080p60 with sound | 1080p60 with sound |
+
+Sender: Intel UHD 620 laptop on Omarchy. If your TV works or does not, open an issue with its model and the line `cast: TV offers ...` from the log below, so it can go in this table.
+
+## Troubleshooting
+
+- **No TVs listed.** Turn the TV on and open its Screen Mirroring source. Check that `nmcli device` shows a `wifi-p2p` device.
+- **Cast failed.** The panel shows the reason. The full log is in `journalctl --user -u omarchy-cast`.
+- **Black screen on the TV.** Open an issue with the `cast: TV offers ...` line from that log.
 
 ## Tests
 
