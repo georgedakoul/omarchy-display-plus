@@ -1,12 +1,12 @@
 # Omarchy Display+
 
-Omarchy Display+ adds a second display panel to the bar, next to Omarchy's own: a screen map that draws every monitor at its real physical size, where you drag screens into place and rotate them. It converts each drag from millimetres to Hyprland's logical pixels, so mixed sizes and scales line up where the screens physically meet, and the layout survives reboots. It also casts to a smart TV over Miracast: mirror a screen or add the TV as another one.
+Omarchy Display+ extends Omarchy's own Display panel. Under its brightness, text size and scale controls it adds a screen map that draws every monitor at its real physical size, where you drag screens into place and rotate them. It converts each drag from millimetres to Hyprland's logical pixels, so mixed sizes and scales line up where the screens physically meet, and the layout survives reboots. It also casts to a smart TV over Miracast: mirror a screen or add the TV as another one.
 
 <img src="docs/panel.png" alt="The Display+ panel extending to a 50 inch TV: the map shows the TV above the 14 inch laptop screen, at their real sizes" width="380">
 
 - **Screen map.** Every screen is drawn at its real size in inches. Drag one to move it, and it snaps to the edges of the others. Click a screen to select it, then rotate it from the buttons under the map.
 - **Cast to TV.** Lists Miracast TVs nearby. Pick Mirror to show the screen you are on, or Extend to get a new screen on the map at the TV's size.
-- Brightness, text size and scale stay in Omarchy's own Display panel, untouched.
+- Brightness, text size and scale are Omarchy's own code, loaded from your install, so they keep up with Omarchy updates.
 
 ## Install
 
@@ -14,7 +14,7 @@ Omarchy Display+ adds a second display panel to the bar, next to Omarchy's own: 
 omarchy plugin add https://github.com/georgedakoul/omarchy-display-plus --enable
 ```
 
-That is all: the icon appears in the bar. Remove it with `omarchy plugin remove ghostl9.display-plus`.
+That is all: the Display icon in the bar now opens the extended panel, and so does Super+Ctrl+D. `omarchy plugin remove ghostl9.display-plus` puts the stock panel back.
 
 ## Needs
 
