@@ -1,8 +1,6 @@
 # Omarchy Display+
 
-A drop-in replacement for Omarchy's Display panel that adds a Windows-style screen map and Miracast casting to any smart TV.
-
-Windows has had Win+K since 2013: pick a TV, and your screen is on it. Linux never got the same, because the pieces belong to different projects (the Wi-Fi driver, NetworkManager, the compositor, the encoder) and nobody joined them up for Hyprland. This plugin does, inside Omarchy's bar. Click the Display icon, pick your TV, press Mirror or Extend.
+Omarchy Display+ is a drop-in replacement for Omarchy's Display panel: a screen map that draws every monitor at its real physical size, where you drag screens into place and rotate them. It converts each drag from millimetres to Hyprland's logical pixels, so mixed sizes and scales line up where the screens physically meet, and the layout is saved to hypr/displays.lua. It also casts to a smart TV over Miracast: mirror a screen or add the TV as another one.
 
 <img src="docs/panel.png" alt="The Display panel extending to a 50 inch TV: the map shows the TV above the 14 inch laptop screen, at their real sizes" width="380">
 
