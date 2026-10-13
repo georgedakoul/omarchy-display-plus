@@ -27,14 +27,10 @@ Panel {
   property var displays: []
   property int enabledDisplayCount: 0
 
-  // Display map and TV screens: positions, physical sizes, rotation and the
-  // Sunshine-streamed TV outputs all come from the tv-displays script.
+  // Display map: positions, physical sizes and rotation come from the tv-displays script.
   readonly property string tvScript: String(Qt.resolvedUrl("tv-displays")).replace(/^file:\/\//, "")
   property string mapStateText: ""
   property var mapDisplays: []
-  property var mapTvs: []
-  property string tailnetIp: ""
-  property bool sunshine: false
   readonly property bool mapBusy: mapActionProc.running
 
   // Miracast: TVs found nearby, and the cast in progress (null when idle).
@@ -53,13 +49,6 @@ Panel {
     for (var j = 0; j < mapDisplays.length; j++) if (mapDisplays[j].enabled && mapDisplays[j].focused) return mapDisplays[j]
     return mapDisplays.length ? mapDisplays[0] : null
   }
-  readonly property var mapSelectedTv: {
-    for (var i = 0; i < mapTvs.length; i++) if (mapSelected && mapTvs[i].name === mapSelected.name) return mapTvs[i]
-    return null
-  }
-  readonly property var tvSizes: ["32", "43", "50", "55", "65", "75"].map(function(s) {
-    return { value: s, label: s + "″" }
-  })
   readonly property var rotations: [
     { value: "0", label: "0°" },
     { value: "1", label: "90°" },
@@ -487,9 +476,6 @@ Panel {
         try {
           var st = JSON.parse(String(text || "{}"))
           root.mapDisplays = st.displays || []
-          root.mapTvs = st.tvs || []
-          root.tailnetIp = st.ip || ""
-          root.sunshine = !!st.sunshine
           root.cast = st.cast || null
           root.mapStateText = text
         } catch (e) {
@@ -954,155 +940,6 @@ Panel {
                 focusable: false
                 onChanged: function(v) { root.runMap(["rotate", root.mapSelected.name, v]) }
               }
-            }
-
-            // ---------- TVs waiting to pair (no screen yet, so not on the map) ----------
-            Repeater {
-              model: root.mapTvs.filter(function(t) { return !t.paired })
-
-              Item {
-                required property var modelData
-
-                width: panelColumn.width
-                implicitHeight: pendingButtons.implicitHeight
-
-                Text {
-                  anchors.left: parent.left
-                  anchors.right: pendingButtons.left
-                  anchors.verticalCenter: parent.verticalCenter
-                  leftPadding: Style.space(6)
-                  textFormat: Text.PlainText
-                  text: modelData.name + " · waiting to pair · " + (root.tailnetIp || "<tailscale ip>") + ":" + modelData.port
-                  color: Qt.darker(root.bar.foreground, 1.4)
-                  font.family: root.bar.fontFamily
-                  font.pixelSize: Style.font.caption
-                  elide: Text.ElideRight
-                }
-
-                Row {
-                  id: pendingButtons
-                  anchors.right: parent.right
-                  spacing: Style.spacing.xs
-
-                  Button {
-                    text: "Pair"
-                    iconText: "󰌆"
-                    bordered: true
-                    enabled: root.sunshine && !root.mapBusy
-                    foreground: root.bar.foreground
-                    fontFamily: root.bar.fontFamily
-                    fontSize: Style.font.caption
-                    onClicked: root.runMap(["pair", String(modelData.n)])
-                  }
-
-                  Button {
-                    iconText: "󰆴"
-                    bordered: true
-                    enabled: !root.mapBusy
-                    foreground: root.bar.foreground
-                    fontFamily: root.bar.fontFamily
-                    fontSize: Style.font.caption
-                    onClicked: root.runMap(["remove", String(modelData.n)])
-                  }
-                }
-              }
-            }
-
-            // ---------- TV screen (selected) ----------
-            Column {
-              width: parent.width
-              spacing: Style.space(8)
-              visible: !!root.mapSelectedTv
-
-              Text {
-                width: parent.width
-                textFormat: Text.PlainText
-                text: root.mapSelectedTv
-                  ? (root.mapSelectedTv.streaming ? "Streaming · " : "Not streaming · ") + "Moonlight: "
-                    + (root.tailnetIp || "<tailscale ip>") + ":" + root.mapSelectedTv.port
-                  : ""
-                color: Qt.darker(root.bar.foreground, 1.4)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-                elide: Text.ElideRight
-                leftPadding: Style.space(6)
-              }
-
-              ButtonGroup {
-                options: root.tvSizes
-                value: root.mapSelected ? String(root.mapSelected.inches) : ""
-                foreground: root.bar.foreground
-                accent: Color.accent
-                fontFamily: root.bar.fontFamily
-                fontSize: Style.font.caption
-                focusable: false
-                onChanged: function(v) { root.runMap(["size", String(root.mapSelectedTv.n), v]) }
-              }
-
-              Row {
-                spacing: Style.spacing.xs
-
-                Button {
-                  text: "Pair"
-                  iconText: "󰌆"
-                  bordered: true
-                  enabled: root.sunshine && !root.mapBusy
-                  foreground: root.bar.foreground
-                  fontFamily: root.bar.fontFamily
-                  fontSize: Style.font.caption
-                  onClicked: root.runMap(["pair", String(root.mapSelectedTv.n)])
-                }
-
-                Button {
-                  text: "Remove TV"
-                  iconText: "󰆴"
-                  bordered: true
-                  enabled: !root.mapBusy
-                  foreground: root.bar.foreground
-                  fontFamily: root.bar.fontFamily
-                  fontSize: Style.font.caption
-                  onClicked: root.runMap(["remove", String(root.mapSelectedTv.n)])
-                }
-              }
-            }
-
-            Row {
-              spacing: Style.spacing.xs
-
-              Button {
-                text: "Add TV screen"
-                iconText: "󰔂"
-                bordered: true
-                enabled: !root.mapBusy
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                fontSize: Style.font.caption
-                onClicked: root.runMap(["add"])
-              }
-
-              Button {
-                visible: !root.sunshine
-                text: "Install streaming"
-                iconText: "󰑐"
-                bordered: true
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                fontSize: Style.font.caption
-                onClicked: {
-                  root.bar.run("omarchy-launch-floating-terminal-with-presentation omarchy-install-service-sunshine")
-                  root.close()
-                }
-              }
-            }
-
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              textFormat: Text.PlainText
-              text: "Add TV screen is for Moonlight over the internet: open Moonlight on the TV, add the address shown, press Pair and type its PIN. The TV appears on the map once it is paired."
-              color: Qt.darker(root.bar.foreground, 1.4)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
             }
 
             // ---------- Cast to TV (Miracast) ----------

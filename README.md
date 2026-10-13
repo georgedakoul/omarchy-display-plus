@@ -1,11 +1,12 @@
 # Omarchy Display+
 
-A drop-in replacement for Omarchy's Display panel that adds a Windows-style screen map, TV screens over the internet, and Miracast casting.
+A drop-in replacement for Omarchy's Display panel that adds a Windows-style screen map and Miracast casting to any smart TV.
 
 Windows has had Win+K since 2013: pick a TV, and your screen is on it. Linux never got the same, because the pieces belong to different projects (the Wi-Fi driver, NetworkManager, the compositor, the encoder) and nobody joined them up for Hyprland. This plugin does, inside Omarchy's bar. Click the Display icon, pick your TV, press Mirror or Extend.
 
+<img src="docs/panel.png" alt="The Display panel extending to a 50 inch TV: the map shows the TV above the 14 inch laptop screen, at their real sizes" width="380">
+
 - **Screen map.** Every screen is drawn at its real size in inches. Drag one to move it, and it snaps to the edges of the others. Click a screen to select it, then rotate it from the buttons under the map.
-- **TV screens over the internet.** Add a TV screen and pair Moonlight on the TV with the address shown. The TV gets its own Sunshine stream over Tailscale. It appears on the map only once a device has paired.
 - **Cast to TV.** Lists Miracast TVs nearby. Pick Mirror to show the screen you are on, or Extend to get a new screen on the map at the TV's size.
 - Brightness, text size, scale and turning screens on or off work as in the stock panel.
 
@@ -20,21 +21,16 @@ git clone https://github.com/georgedakoul/omarchy-display-plus ~/.config/omarchy
    ```lua
    require("default.hypr.require_optional").module("hypr.displays")
    ```
-3. Append to `~/.config/hypr/autostart.lua`:
-   ```lua
-   o.launch_on_start(os.getenv("HOME") .. "/.config/omarchy/plugins/ghostl9.monitor/tv-displays restore")
-   ```
-4. Run `omarchy restart shell`.
+3. Run `omarchy restart shell`.
 
 ## Needs
 
 - Omarchy with Hyprland's Lua config.
-- TV screens: Sunshine (the panel's Install streaming button runs `omarchy-install-service-sunshine`), Tailscale, and Moonlight on the TV. Ports are opened on `tailscale0` only.
 - Casting: NetworkManager with a Wi-Fi card that supports Wi-Fi Direct (`iw list` shows `P2P-GO`), a GPU with VA-API H.264 encoding, `dnsmasq`, `ffmpeg` and `wf-recorder` (`sudo pacman -S wf-recorder`).
 
 ## How it works
 
-- `tv-displays` keeps positions, rotation and TV screens in `~/.config/omarchy/tv-displays.json` and writes them to `~/.config/hypr/displays.lua`.
+- `tv-displays` keeps positions and rotation in `~/.config/omarchy/tv-displays.json` and writes them to `~/.config/hypr/displays.lua`.
 - `cast` finds TVs through NetworkManager, connects over Wi-Fi Direct, runs the Miracast session itself and streams with `wf-recorder`, hardware-encoded through VA-API. It sends the stream exactly as the Wi-Fi Display spec asks (the H.264 level the TV can decode, the fixed MPEG-TS PIDs), because TVs tested only against Windows show a black screen for anything else.
 
 ## Tested on
