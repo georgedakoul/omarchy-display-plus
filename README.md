@@ -39,6 +39,7 @@ Sender: Intel UHD 620 laptop on Omarchy. If your TV works or does not, open an i
 - **No TVs listed.** Turn the TV on and open its Screen Mirroring source. Check that `nmcli device` shows a `wifi-p2p` device.
 - **Cast failed.** The panel shows the reason. The full log is in `journalctl --user -u omarchy-cast`.
 - **Black screen on the TV.** Open an issue with the `cast: TV offers ...` line from that log.
+- **The Display icon is gone after an Omarchy update.** Display+ builds on Omarchy's own Display panel, so a big change to that panel can stop it loading. Run `omarchy plugin update` to get the fix, or `omarchy plugin remove ghostl9.display-plus` to go back to the stock panel, and open an issue.
 
 ## Tests
 
