@@ -1,25 +1,20 @@
 # Omarchy Display+
 
-Omarchy Display+ is a drop-in replacement for Omarchy's Display panel: a screen map that draws every monitor at its real physical size, where you drag screens into place and rotate them. It converts each drag from millimetres to Hyprland's logical pixels, so mixed sizes and scales line up where the screens physically meet, and the layout is saved to hypr/displays.lua. It also casts to a smart TV over Miracast: mirror a screen or add the TV as another one.
+Omarchy Display+ adds a second display panel to the bar, next to Omarchy's own: a screen map that draws every monitor at its real physical size, where you drag screens into place and rotate them. It converts each drag from millimetres to Hyprland's logical pixels, so mixed sizes and scales line up where the screens physically meet, and the layout survives reboots. It also casts to a smart TV over Miracast: mirror a screen or add the TV as another one.
 
-<img src="docs/panel.png" alt="The Display panel extending to a 50 inch TV: the map shows the TV above the 14 inch laptop screen, at their real sizes" width="380">
+<img src="docs/panel.png" alt="The Display+ panel extending to a 50 inch TV: the map shows the TV above the 14 inch laptop screen, at their real sizes" width="380">
 
 - **Screen map.** Every screen is drawn at its real size in inches. Drag one to move it, and it snaps to the edges of the others. Click a screen to select it, then rotate it from the buttons under the map.
 - **Cast to TV.** Lists Miracast TVs nearby. Pick Mirror to show the screen you are on, or Extend to get a new screen on the map at the TV's size.
-- Brightness, text size, scale and turning screens on or off work as in the stock panel.
+- Brightness, text size and scale stay in Omarchy's own Display panel, untouched.
 
 ## Install
 
 ```sh
-git clone https://github.com/georgedakoul/omarchy-display-plus ~/.config/omarchy/plugins/ghostl9.monitor
+omarchy plugin add https://github.com/georgedakoul/omarchy-display-plus --enable
 ```
 
-1. In `~/.config/omarchy/shell.json`, replace `omarchy.monitor` with `ghostl9.monitor` in `bar.layout`.
-2. Append to `~/.config/hypr/monitors.lua`:
-   ```lua
-   require("default.hypr.require_optional").module("hypr.displays")
-   ```
-3. Run `omarchy restart shell`.
+That is all: the icon appears in the bar. Remove it with `omarchy plugin remove ghostl9.display-plus`.
 
 ## Needs
 
@@ -28,7 +23,7 @@ git clone https://github.com/georgedakoul/omarchy-display-plus ~/.config/omarchy
 
 ## How it works
 
-- `tv-displays` keeps positions and rotation in `~/.config/omarchy/tv-displays.json` and writes them to `~/.config/hypr/displays.lua`.
+- `tv-displays` keeps positions and rotation in `~/.config/omarchy/tv-displays.json` and writes them to `~/.local/state/omarchy/toggles/hypr/display-plus.lua`, which Omarchy loads after `hypr/monitors.lua`. Your own config files are never edited.
 - `cast` finds TVs through NetworkManager, connects over Wi-Fi Direct, runs the Miracast session itself and streams with `wf-recorder`, hardware-encoded through VA-API. It sends the stream exactly as the Wi-Fi Display spec asks (the H.264 level the TV can decode, the fixed MPEG-TS PIDs), because TVs tested only against Windows show a black screen for anything else.
 
 ## Tested on

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "ghostl9.monitor",
-  "name": "Display",
-  "version": "1.0.0",
+  "id": "ghostl9.display-plus",
+  "name": "Display+",
+  "version": "1.1.0",
   "author": "George Damian Koulouris",
-  "description": "Screen map with drag-to-arrange and rotation, plus Miracast casting to any smart TV",
+  "description": "Screen map to drag, snap and rotate your screens at their real size, plus Miracast casting to a TV",
   "kinds": [
     "bar-widget"
   ],
@@ -12,12 +12,10 @@
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "Display",
-    "description": "Screen map with drag-to-arrange and rotation, plus Miracast casting to any smart TV",
+    "displayName": "Display+",
+    "description": "Screen map to drag, snap and rotate your screens at their real size, plus Miracast casting to a TV",
     "category": "System",
-    "allowMultiple": false
-  },
-  "omarchy": {
-    "clonedFrom": "omarchy.monitor"
+    "allowMultiple": false,
+    "defaultSection": "right"
   }
 }
