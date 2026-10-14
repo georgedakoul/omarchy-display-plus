@@ -13,6 +13,7 @@ NM = "org.freedesktop.NetworkManager"
 CON = "omarchy-cast"
 OUTPUT = "CAST-1"
 UNIT = "omarchy-cast"
+SINK = "omarchy-cast"
 STATUS = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "omarchy-cast.json")
 # WFD device info: source, available for a session, RTSP on 7236, 200 Mbps.
 WFD_IES = "00:00:06:00:90:1c:44:00:c8"
@@ -154,8 +155,7 @@ def recorder(output, sink_ip, fmt):
            "-p", "profile=constrained_baseline", "-p", f"level={fmt['level']}", "-p", "aud=1",
            "-p", f"g={fmt['fps']}", "-p", "bf=0", "-p", "b=8M", "-m", "mpegts", "-f", "pipe:1", "-y"]
     if fmt["aac"]:
-        sink = run("pactl", "get-default-sink").stdout.strip()
-        cmd += ["--audio=" + sink + ".monitor", "-C", "aac", "-R", "48000"]
+        cmd += ["--audio=" + SINK + ".monitor", "-C", "aac", "-R", "48000"]
     # WFD fixes the transport stream layout: PMT on PID 0x100, video on 0x1011, audio on 0x1100.
     mux = ["ffmpeg", "-v", "error", "-fflags", "nobuffer", "-probesize", "32768", "-analyzeduration", "0",
            "-f", "mpegts", "-i", "pipe:0", "-map", "0", "-c", "copy", "-streamid", "0:0x1011",
@@ -165,8 +165,17 @@ def recorder(output, sink_ip, fmt):
     return [cap, subprocess.Popen(mux, stdin=cap.stdout, stdout=subprocess.DEVNULL)]
 
 
+def tv_sink(name):
+    """The TV as a sound output of its own, so the audio menu sends sound to the laptop or the TV, never both."""
+    run("pactl", "load-module", "module-null-sink", f"sink_name={SINK}", 'device.description="%s"' % name.replace('"', ""))
+    run("pactl", "set-default-sink", SINK)
+
+
 def teardown():
     run("nmcli", "connection", "delete", CON)
+    for line in run("pactl", "list", "short", "modules").stdout.splitlines():
+        if f"sink_name={SINK} " in line + " ":
+            run("pactl", "unload-module", line.split()[0])
     if any(m["name"] == OUTPUT for m in json.loads(run("hyprctl", "monitors", "all", "-j").stdout or "[]")):
         run("hyprctl", "output", "remove", OUTPUT)
 
@@ -178,6 +187,7 @@ def start(mac, mode):
     status(**info, state="connecting")
     rec = None
     stream = {}
+    speakers = run("pactl", "get-default-sink").stdout.strip()
 
     def cleanup(*_, error=None):
         for p in rec or []:
@@ -187,6 +197,8 @@ def start(mac, mode):
             except subprocess.TimeoutExpired:
                 p.kill()
         teardown()
+        if speakers and speakers != SINK:
+            run("pactl", "set-default-sink", speakers)
         if error:  # stays in the panel until dismissed with `cast stop`
             print(f"cast: {error}", file=sys.stderr)
             status(**info, state="failed", error=str(error))
@@ -252,6 +264,8 @@ def start(mac, mode):
         conn.settimeout(25)
         while True:
             if stream.get("play") and not rec:
+                if fmt["aac"]:
+                    tv_sink(info["name"])
                 rec = recorder(output, sink_ip, fmt)
                 status(**info, state="casting")
             try:
