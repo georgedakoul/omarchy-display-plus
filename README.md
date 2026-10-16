@@ -5,7 +5,7 @@ Omarchy Display+ extends Omarchy's own Display panel. Under its brightness, text
 <img src="docs/panel.png" alt="The Display+ panel extending to a 50 inch TV: the map shows the TV above the 14 inch laptop screen, at their real sizes" width="380">
 
 - **Screen map.** Every screen is drawn at its real size in inches. Drag one to move it, and it snaps to the edges of the others. Click a screen to select it, then rotate it from the buttons under the map.
-- **Cast to TV.** Lists Miracast TVs nearby. Pick Mirror to show the screen you are on, or Extend to get a new screen on the map at the TV's size.
+- **Cast to TV.** Lists Miracast TVs nearby. Pick Mirror to show the screen you are on, or Extend to get a new screen on the map at the TV's size. A TV (a cast screen, or any screen 32 inches and up) is scaled to the laptop's width, so it shows what the laptop shows, only bigger.
 - Brightness, text size and scale are Omarchy's own code, loaded from your install, so they keep up with Omarchy updates.
 
 ## Install

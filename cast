@@ -215,6 +215,7 @@ def start(mac, mode):
             raise RuntimeError("wf-recorder is not installed")
         if mode == "extend":
             run("hyprctl", "output", "create", "headless", OUTPUT)
+            run(os.path.join(os.path.dirname(os.path.realpath(__file__)), "tv-displays"), "fit", OUTPUT)
         server = socket.create_server(("0.0.0.0", RTSP_PORT), reuse_port=True)
         server.settimeout(60)
         run("nmcli", "connection", "delete", CON)
