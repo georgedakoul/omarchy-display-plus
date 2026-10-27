@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Ui
 import qs.Commons
-import "file:///usr/share/omarchy/shell/plugins/panels/monitor" as Stock
+import qs.plugins.panels.monitor as Stock
 
 // Omarchy's own Display panel, extended rather than copied: brightness, text
 // size and scale stay Omarchy's code, and the screen map and casting are added
